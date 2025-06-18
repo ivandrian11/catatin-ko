@@ -22,9 +22,9 @@ import {
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import CategorySelector from '../transactions/category-selector'
+import Numpad from '../transactions/numpad'
 import CategoryModal from './category-modal'
-import CategorySelector from './transactions/category-selector'
-import Numpad from './transactions/numpad'
 
 interface TransactionModalProps {
   isOpen: boolean

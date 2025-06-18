@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/accordion'
 import { toast } from 'sonner'
 import { Transaction } from '@/types'
-import CategoryModal from '@/components/category-modal'
+import CategoryModal from './category-modal'
 import { useApp } from '@/contexts/app-context'
 
 interface SettingsModalProps {

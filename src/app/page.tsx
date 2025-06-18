@@ -1,6 +1,6 @@
 'use client'
 
-import SettingsModal from '@/components/settings-modal'
+import SettingsModal from '@/components/modal/settings-modal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useApp } from '@/contexts/app-context'

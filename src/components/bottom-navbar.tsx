@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { usePathname } from 'next/navigation'
 import { Button } from './ui/button'
 import { Plus } from 'lucide-react'
-import TransactionModal from './transaction-modal'
+import TransactionModal from './modal/transaction-modal'
 
 export const BottomNavbar = () => {
   const router = useRouter()
