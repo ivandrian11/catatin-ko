@@ -6,10 +6,13 @@ import React, {
   useState,
   useEffect,
   ReactNode,
+  useCallback,
+  useMemo,
 } from 'react'
 import { Transaction, Category, AppSettings } from '@/types'
 import { defaultCategories, defaultSettings } from '@/data/constants'
 import { toast } from 'sonner'
+import { useLocalStorage } from '@/hooks/use-local-storage'
 
 interface AppContextProps {
   transactions: Transaction[]
@@ -48,163 +51,141 @@ interface AppProviderProps {
 }
 
 export const AppProvider = ({ children }: AppProviderProps) => {
-  const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
-  const [settings, setSettings] = useState<AppSettings>(defaultSettings)
+  const [transactions, setTransactions] = useLocalStorage<Transaction[]>(
+    'catatinko_transactions',
+    []
+  )
+  const [categories, setCategories] = useLocalStorage<Category[]>(
+    'catatinko_categories',
+    defaultCategories
+  )
+  const [settings, setSettings] = useLocalStorage<AppSettings>(
+    'catatinko_settings',
+    defaultSettings
+  )
+
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date())
   const [searchQuery, setSearchQuery] = useState('')
   const [isRevealed, setIsRevealed] = useState(false)
   const [revealTimer, setRevealTimer] = useState<NodeJS.Timeout | null>(null)
 
-  // Define getCategory function before it's used in filteredTransactions
-  const getCategory = (id: string) => {
-    return categories.find((c) => c.id === id)
-  }
-
-  // Load data from localStorage on initialization
+  // Apply dark mode when settings change
   useEffect(() => {
-    const storedTransactions = localStorage.getItem('catatinko_transactions')
-    const storedCategories = localStorage.getItem('catatinko_categories')
-    const storedSettings = localStorage.getItem('catatinko_settings')
+    document.documentElement.classList.toggle('dark', settings.darkMode)
+  }, [settings.darkMode])
 
-    if (storedTransactions) {
-      setTransactions(JSON.parse(storedTransactions))
-    }
+  // Memoized utility functions
+  const getCategory = useCallback(
+    (id: string) => categories.find((c) => c.id === id),
+    [categories]
+  )
 
-    if (storedCategories) {
-      setCategories(JSON.parse(storedCategories))
-    } else {
-      setCategories(defaultCategories)
-    }
+  const showMaskedValue = useCallback(
+    (timeout = 3000) => {
+      setIsRevealed(true)
+      if (revealTimer) clearTimeout(revealTimer)
+      const timer = setTimeout(() => setIsRevealed(false), timeout)
+      setRevealTimer(timer)
+    },
+    [revealTimer]
+  )
 
-    if (storedSettings) {
-      setSettings(JSON.parse(storedSettings))
-    } else {
-      setSettings(defaultSettings)
-    }
-  }, [])
-
-  // Save data to localStorage when it changes
-  useEffect(() => {
-    localStorage.setItem('catatinko_transactions', JSON.stringify(transactions))
-  }, [transactions])
-
-  useEffect(() => {
-    localStorage.setItem('catatinko_categories', JSON.stringify(categories))
-  }, [categories])
-
-  useEffect(() => {
-    localStorage.setItem('catatinko_settings', JSON.stringify(settings))
-
-    // Apply dark mode
-    if (settings.darkMode) {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
-  }, [settings])
-
-  const showMaskedValue = (timeout = 3000) => {
-    setIsRevealed(true)
-
-    if (revealTimer) {
-      clearTimeout(revealTimer)
-    }
-
-    const timer = setTimeout(() => {
-      setIsRevealed(false)
-    }, timeout)
-
-    setRevealTimer(timer)
-  }
-
-  const filteredTransactions = transactions
-    .filter((transaction) => {
-      // Filter by month
+  // Memoized filtered transactions
+  const filteredTransactions = useMemo(() => {
+    const monthFilter = (transaction: Transaction) => {
       const transactionDate = new Date(transaction.date)
-      const isCurrentMonth =
+      return (
         transactionDate.getMonth() === selectedMonth.getMonth() &&
         transactionDate.getFullYear() === selectedMonth.getFullYear()
-
-      // Filter by search query
-      const matchesSearch = searchQuery
-        ? transaction.notes
-            ?.toLowerCase()
-            .includes(searchQuery.toLowerCase()) ||
-          getCategory(transaction.categoryId)
-            ?.name.toLowerCase()
-            .includes(searchQuery.toLowerCase())
-        : true
-
-      return isCurrentMonth && matchesSearch
-    })
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-
-  const addTransaction = (transaction: Omit<Transaction, 'id'>) => {
-    const newTransaction = {
-      ...transaction,
-      id: crypto.randomUUID(),
-    }
-    setTransactions((prev) => [...prev, newTransaction])
-    toast.success('Transaction added successfully')
-  }
-
-  const updateTransaction = (transaction: Transaction) => {
-    setTransactions((prev) =>
-      prev.map((t) => (t.id === transaction.id ? transaction : t))
-    )
-    toast.success('Transaction updated successfully')
-  }
-
-  const deleteTransaction = (id: string) => {
-    setTransactions((prev) => prev.filter((t) => t.id !== id))
-    toast.success('Transaction deleted successfully', {
-      action: {
-        label: 'Undo',
-        onClick: () => {
-          const deletedTransaction = transactions.find((t) => t.id === id)
-          if (deletedTransaction) {
-            setTransactions((prev) => [...prev, deletedTransaction])
-          }
-        },
-      },
-    })
-  }
-
-  const addCategory = (category: Omit<Category, 'id'>) => {
-    const newCategory = {
-      ...category,
-      id: crypto.randomUUID(),
-    }
-    setCategories((prev) => [...prev, newCategory])
-  }
-
-  const updateCategory = (category: Category) => {
-    setCategories((prev) =>
-      prev.map((c) => (c.id === category.id ? category : c))
-    )
-  }
-
-  const deleteCategory = (id: string) => {
-    // Check if category is being used
-    const isUsed = transactions.some((t) => t.categoryId === id)
-
-    if (isUsed) {
-      toast.error(
-        'Category is being used in transactions and cannot be deleted'
       )
-      return
     }
 
-    setCategories((prev) => prev.filter((c) => c.id !== id))
-    toast.success('Category deleted successfully')
-  }
+    const searchFilter = (transaction: Transaction) => {
+      if (!searchQuery) return true
+      const query = searchQuery.toLowerCase()
+      return (
+        transaction.notes?.toLowerCase().includes(query) ||
+        getCategory(transaction.categoryId)?.name.toLowerCase().includes(query)
+      )
+    }
 
-  const updateSettings = (newSettings: Partial<AppSettings>) => {
-    setSettings((prev: AppSettings) => ({ ...prev, ...newSettings }))
-  }
+    return transactions
+      .filter(
+        (transaction) => monthFilter(transaction) && searchFilter(transaction)
+      )
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  }, [transactions, selectedMonth, searchQuery, getCategory])
 
-  const resetData = () => {
+  // Transaction operations with undo functionality
+  const transactionOperations = useMemo(
+    () => ({
+      add: (transaction: Omit<Transaction, 'id'>) => {
+        const newTransaction = { ...transaction, id: crypto.randomUUID() }
+        setTransactions((prev) => [...prev, newTransaction])
+        toast.success('Transaction added successfully')
+      },
+
+      update: (transaction: Transaction) => {
+        setTransactions((prev) =>
+          prev.map((t) => (t.id === transaction.id ? transaction : t))
+        )
+        toast.success('Transaction updated successfully')
+      },
+
+      delete: (id: string) => {
+        const transactionToDelete = transactions.find((t) => t.id === id)
+        setTransactions((prev) => prev.filter((t) => t.id !== id))
+
+        toast.success('Transaction deleted successfully', {
+          action: {
+            label: 'Undo',
+            onClick: () =>
+              transactionToDelete &&
+              setTransactions((prev) => [...prev, transactionToDelete]),
+          },
+        })
+      },
+    }),
+    [transactions, setTransactions]
+  )
+
+  // Category operations
+  const categoryOperations = useMemo(
+    () => ({
+      add: (category: Omit<Category, 'id'>) => {
+        const newCategory = { ...category, id: crypto.randomUUID() }
+        setCategories((prev) => [...prev, newCategory])
+      },
+
+      update: (category: Category) => {
+        setCategories((prev) =>
+          prev.map((c) => (c.id === category.id ? category : c))
+        )
+      },
+
+      delete: (id: string) => {
+        const isUsed = transactions.some((t) => t.categoryId === id)
+        if (isUsed) {
+          toast.error(
+            'Category is being used in transactions and cannot be deleted'
+          )
+          return
+        }
+        setCategories((prev) => prev.filter((c) => c.id !== id))
+        toast.success('Category deleted successfully')
+      },
+    }),
+    [transactions, setCategories]
+  )
+
+  const updateSettings = useCallback(
+    (newSettings: Partial<AppSettings>) => {
+      setSettings((prev) => ({ ...prev, ...newSettings }))
+    },
+    [setSettings]
+  )
+
+  const resetData = useCallback(() => {
     if (
       confirm('Are you sure you want to reset all data? This cannot be undone.')
     ) {
@@ -213,33 +194,48 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       setSettings(defaultSettings)
       toast.success('All data has been reset')
     }
-  }
+  }, [setTransactions, setCategories, setSettings])
+
+  const contextValue = useMemo(
+    () => ({
+      transactions,
+      categories,
+      settings,
+      addTransaction: transactionOperations.add,
+      updateTransaction: transactionOperations.update,
+      deleteTransaction: transactionOperations.delete,
+      addCategory: categoryOperations.add,
+      updateCategory: categoryOperations.update,
+      deleteCategory: categoryOperations.delete,
+      updateSettings,
+      getCategory,
+      resetData,
+      selectedMonth,
+      setSelectedMonth,
+      filteredTransactions,
+      searchQuery,
+      setSearchQuery,
+      showMaskedValue,
+      isRevealed,
+    }),
+    [
+      transactions,
+      categories,
+      settings,
+      selectedMonth,
+      filteredTransactions,
+      searchQuery,
+      isRevealed,
+      transactionOperations,
+      categoryOperations,
+      updateSettings,
+      getCategory,
+      resetData,
+      showMaskedValue,
+    ]
+  )
 
   return (
-    <AppContext.Provider
-      value={{
-        transactions,
-        categories,
-        settings,
-        addTransaction,
-        updateTransaction,
-        deleteTransaction,
-        addCategory,
-        updateCategory,
-        deleteCategory,
-        updateSettings,
-        getCategory,
-        resetData,
-        selectedMonth,
-        setSelectedMonth,
-        filteredTransactions,
-        searchQuery,
-        setSearchQuery,
-        showMaskedValue,
-        isRevealed,
-      }}
-    >
-      {children}
-    </AppContext.Provider>
+    <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>
   )
 }

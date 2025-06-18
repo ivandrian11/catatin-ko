@@ -1,13 +1,9 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
-import {
-  getTodayString,
-  getYesterdayString,
-  formatNumber,
-  parseFormattedNumber,
-} from '@/lib/utils'
+import { getYesterdayString } from '@/lib/utils'
 import { Transaction } from '@/types'
 import { useApp } from '@/contexts/app-context'
+import { useTransactionForm } from '@/hooks/use-transaction-form'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Calendar as CalendarIcon } from 'lucide-react'
@@ -38,93 +34,31 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   transaction,
 }) => {
   const { addTransaction, updateTransaction } = useApp()
-
-  const [amount, setAmount] = useState('0')
-  const [displayAmount, setDisplayAmount] = useState('0')
-  const [type, setType] = useState<'expense' | 'income'>('expense')
-  const [categoryId, setCategoryId] = useState('')
-  const [date, setDate] = useState(getTodayString())
-  const [notes, setNotes] = useState('')
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
 
-  // Reset form when opening
-  useEffect(() => {
-    if (isOpen) {
-      if (transaction) {
-        // Edit mode
-        const formattedAmount = formatNumber(transaction.amount.toString())
-        setAmount(transaction.amount.toString())
-        setDisplayAmount(formattedAmount)
-        setType(transaction.type)
-        setCategoryId(transaction.categoryId)
-        setDate(transaction.date)
-        setNotes(transaction.notes || '')
-      } else {
-        // Add mode
-        setAmount('0')
-        setDisplayAmount('0')
-        setType('expense')
-        setCategoryId('')
-        setDate(getTodayString())
-        setNotes('')
-      }
-    }
-  }, [isOpen, transaction])
-
-  const handleNumpadChange = (value: string) => {
-    setDisplayAmount(value)
-
-    // Extract numeric value for saving
-    try {
-      const unformattedValue = parseFormattedNumber(value)
-      const numericValue = eval(
-        unformattedValue.replace(/×/g, '*').replace(/÷/g, '/')
-      )
-      setAmount(numericValue.toString())
-    } catch {
-      const unformattedValue = parseFormattedNumber(value)
-      setAmount(unformattedValue)
-    }
-  }
+  const {
+    formData,
+    updateField,
+    handleNumpadChange,
+    validate,
+    getTransactionData,
+  } = useTransactionForm(transaction)
 
   const handleSubmit = () => {
-    const numericAmount = parseFloat(amount) || 0
+    if (!validate()) return
 
-    if (numericAmount <= 0) {
-      alert('Amount must be greater than zero')
-      return
-    }
-
-    if (!categoryId) {
-      alert('Please select a category')
-      return
-    }
-
-    const transactionData = {
-      amount: numericAmount,
-      type,
-      categoryId,
-      date,
-      notes: notes.trim() || undefined,
-    }
+    const transactionData = getTransactionData()
 
     if (transaction) {
-      // Update existing transaction
-      updateTransaction({
-        ...transactionData,
-        id: transaction.id,
-      })
+      updateTransaction({ ...transactionData, id: transaction.id })
     } else {
-      // Add new transaction
       addTransaction(transactionData)
     }
 
     onClose()
   }
 
-  const setYesterdayDate = () => {
-    setDate(getYesterdayString())
-  }
+  const setYesterdayDate = () => updateField('date', getYesterdayString())
 
   const title = transaction ? 'Edit Transaksi' : 'Tambah Transaksi'
 
@@ -138,26 +72,28 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
             <div className='flex-1 flex justify-end items-center space-x-2'>
               <Switch
                 id='transaction-type'
-                checked={type === 'income'}
+                checked={formData.type === 'income'}
                 onCheckedChange={(checked) =>
-                  setType(checked ? 'income' : 'expense')
+                  updateField('type', checked ? 'income' : 'expense')
                 }
               />
               <Label htmlFor='transaction-type' className='text-sm lg:pr-12'>
-                {type === 'expense' ? 'Pengeluaran' : 'Pemasukan'}
+                {formData.type === 'expense' ? 'Pengeluaran' : 'Pemasukan'}
               </Label>
             </div>
           </div>
 
           <div className='flex flex-col h-full pb-14'>
             <div className='text-center mb-6'>
-              <h2 className='text-3xl font-bold'>Rp {displayAmount}</h2>
+              <h2 className='text-3xl font-bold'>
+                Rp {formData.displayAmount}
+              </h2>
             </div>
 
             <CategorySelector
-              type={type}
-              selectedCategoryId={categoryId}
-              onSelect={setCategoryId}
+              type={formData.type}
+              selectedCategoryId={formData.categoryId}
+              onSelect={(categoryId) => updateField('categoryId', categoryId)}
               onEdit={() => setIsCategoryModalOpen(true)}
             />
 
@@ -179,8 +115,8 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                       )}
                     >
                       <CalendarIcon className='mr-2 h-4 w-4' />
-                      {date ? (
-                        format(new Date(date), 'PPP', { locale: id })
+                      {formData.date ? (
+                        format(new Date(formData.date), 'PPP', { locale: id })
                       ) : (
                         <span>Pick a date</span>
                       )}
@@ -189,19 +125,16 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                   <PopoverContent className='w-auto p-0'>
                     <Calendar
                       mode='single'
-                      selected={new Date(date)}
+                      selected={new Date(formData.date)}
                       onSelect={(date: Date | undefined) => {
                         if (date) {
-                          // Format date to local timezone to avoid timezone offset issues
                           const year = date.getFullYear()
                           const month = String(date.getMonth() + 1).padStart(
                             2,
                             '0'
                           )
                           const day = String(date.getDate()).padStart(2, '0')
-                          setDate(`${year}-${month}-${day}`)
-                        } else {
-                          setDate(getTodayString())
+                          updateField('date', `${year}-${month}-${day}`)
                         }
                       }}
                       initialFocus
@@ -241,14 +174,14 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
               <Input
                 id='transaction-notes'
                 placeholder='Tambahkan catatan'
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
+                value={formData.notes}
+                onChange={(e) => updateField('notes', e.target.value)}
               />
             </div>
 
             <div className='mt-auto'>
               <Numpad
-                value={displayAmount}
+                value={formData.displayAmount}
                 onChange={handleNumpadChange}
                 onSubmit={handleSubmit}
               />
@@ -260,7 +193,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       <CategoryModal
         isOpen={isCategoryModalOpen}
         onClose={() => setIsCategoryModalOpen(false)}
-        activeTab={type}
+        activeTab={formData.type}
       />
     </>
   )
