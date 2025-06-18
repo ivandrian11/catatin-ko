@@ -175,7 +175,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                       id='transaction-date'
                       variant='outline'
                       className={cn(
-                        'w-full justify-start text-left font-normal'
+                        'w-full justify-start text-left font-normal h-10'
                       )}
                     >
                       <CalendarIcon className='mr-2 h-4 w-4' />
@@ -190,11 +190,20 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                     <Calendar
                       mode='single'
                       selected={new Date(date)}
-                      onSelect={(date: Date | undefined) =>
-                        setDate(
-                          date?.toISOString().split('T')[0] || getTodayString()
-                        )
-                      }
+                      onSelect={(date: Date | undefined) => {
+                        if (date) {
+                          // Format date to local timezone to avoid timezone offset issues
+                          const year = date.getFullYear()
+                          const month = String(date.getMonth() + 1).padStart(
+                            2,
+                            '0'
+                          )
+                          const day = String(date.getDate()).padStart(2, '0')
+                          setDate(`${year}-${month}-${day}`)
+                        } else {
+                          setDate(getTodayString())
+                        }
+                      }}
                       initialFocus
                       className='pointer-events-auto'
                     />
@@ -214,8 +223,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
               <div className='flex items-end'>
                 <Button
                   variant='outline'
-                  size='sm'
-                  className='h-10'
+                  className='h-10 px-3'
                   onClick={setYesterdayDate}
                 >
                   Kemarin?
