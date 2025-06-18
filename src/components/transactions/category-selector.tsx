@@ -26,7 +26,7 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
 
   return (
     <div className='my-4'>
-      <h3 className='text-sm font-medium mb-2 text-muted-foreground'>
+      <h3 className='text-sm font-medium mb-3 text-muted-foreground'>
         Category
       </h3>
       <ScrollArea className='w-full pb-2'>
@@ -35,19 +35,41 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
             <button
               key={category.id}
               onClick={() => onSelect(category.id)}
-              className={`category-item ${
-                selectedCategoryId === category.id
-                  ? 'bg-primary/10 ring-2 ring-primary'
-                  : ''
-              }`}
+              className={`
+                flex flex-col items-center justify-center
+                min-w-[60px] h-[60px] p-2 rounded-xl
+                border border-transparent
+                transition-all duration-200 ease-in-out
+                active:scale-95 cursor-pointer
+                ${
+                  selectedCategoryId === category.id
+                    ? 'bg-primary/15 border-primary/30 ring-2 ring-primary/50 shadow-sm'
+                    : 'bg-background hover:bg-muted hover:border-border/20 hover:shadow-sm'
+                }
+              `}
             >
-              <span className='category-emoji'>{category.emoji}</span>
-              <span className='text-xs'>{category.name}</span>
+              <span className='text-lg mb-1'>{category.emoji}</span>
+              <span className='text-xs font-medium leading-tight text-center'>
+                {category.name}
+              </span>
             </button>
           ))}
-          <Button variant='ghost' onClick={onEdit} className='category-item'>
-            <Pencil size={24} className='mb-1' />
-            <span className='text-xs'>Edit</span>
+          <Button
+            variant='ghost'
+            onClick={onEdit}
+            className='
+              flex flex-col items-center justify-center
+              min-w-[60px] h-[60px] p-2 rounded-xl
+              border border-dashed border-border/40
+              hover:border-border/60 hover:bg-muted/50
+              transition-all duration-200 ease-in-out
+              active:scale-95 cursor-pointer
+            '
+          >
+            <Pencil size={18} className='mb-1 text-muted-foreground' />
+            <span className='text-xs font-medium text-muted-foreground'>
+              Edit
+            </span>
           </Button>
         </div>
       </ScrollArea>
