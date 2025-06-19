@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleSpreadsheet } from 'google-spreadsheet'
 import { JWT } from 'google-auth-library'
-import credentials from '@/data/google-sheets-api.json'
 import { Category } from '@/types'
 
 const SCOPES = [
@@ -11,8 +10,8 @@ const SCOPES = [
 
 async function getDoc(sheetId: string) {
   const serviceAccountAuth = new JWT({
-    email: credentials.client_email,
-    key: credentials.private_key,
+    email: process.env.NEXT_GOOGLE_CLIENT_EMAIL,
+    key: process.env.NEXT_GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     scopes: SCOPES,
   })
 
