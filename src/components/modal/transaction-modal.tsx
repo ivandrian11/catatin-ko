@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { getYesterdayString } from '@/lib/utils'
 import { Transaction } from '@/types'
@@ -42,7 +42,15 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     handleNumpadChange,
     validate,
     getTransactionData,
+    resetForm,
   } = useTransactionForm(transaction)
+
+  // Reset form ketika modal dibuka untuk transaksi baru
+  useEffect(() => {
+    if (isOpen && !transaction) {
+      resetForm()
+    }
+  }, [isOpen, transaction, resetForm])
 
   const handleSubmit = () => {
     if (!validate()) return
@@ -55,6 +63,19 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       addTransaction(transactionData)
     }
 
+    // Reset form setelah submit jika bukan edit
+    if (!transaction) {
+      resetForm()
+    }
+
+    onClose()
+  }
+
+  const handleClose = () => {
+    // Reset form ketika modal ditutup untuk transaksi baru
+    if (!transaction) {
+      resetForm()
+    }
     onClose()
   }
 
@@ -62,9 +83,12 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
 
   const title = transaction ? 'Edit Transaksi' : 'Tambah Transaksi'
 
+  // Get current selected date for calendar
+  const currentSelectedDate = new Date(formData.date)
+
   return (
     <>
-      <Sheet open={isOpen} onOpenChange={onClose}>
+      <Sheet open={isOpen} onOpenChange={handleClose}>
         <SheetContent side='bottom' className='h-[90vh] pt-6 px-4'>
           <div className='flex justify-between items-center mb-4'>
             <div className='lg:flex-1 lg:block hidden'></div>
@@ -116,7 +140,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                     >
                       <CalendarIcon className='mr-2 h-4 w-4' />
                       {formData.date ? (
-                        format(new Date(formData.date), 'PPP', { locale: id })
+                        format(currentSelectedDate, 'PPP', { locale: id })
                       ) : (
                         <span>Pick a date</span>
                       )}
@@ -125,7 +149,8 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                   <PopoverContent className='w-auto p-0'>
                     <Calendar
                       mode='single'
-                      selected={new Date(formData.date)}
+                      selected={currentSelectedDate}
+                      defaultMonth={currentSelectedDate}
                       onSelect={(date: Date | undefined) => {
                         if (date) {
                           const year = date.getFullYear()

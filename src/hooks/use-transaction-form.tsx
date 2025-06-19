@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Transaction } from '@/types'
 import { getTodayString, formatNumber, parseFormattedNumber } from '@/lib/utils'
 
@@ -81,11 +81,25 @@ export const useTransactionForm = (transaction?: Transaction) => {
     notes: formData.notes.trim() || undefined,
   })
 
+  // Tambahkan di hook useTransactionForm
+  const resetForm = useCallback(() => {
+    setFormData({
+      amount: '0',
+      displayAmount: '0',
+      type: 'expense',
+      categoryId: '',
+      date: new Date().toISOString().split('T')[0],
+      notes: '',
+    })
+  }, [])
+
+  // Tambahkan resetForm ke return statement
   return {
     formData,
     updateField,
     handleNumpadChange,
     validate,
     getTransactionData,
+    resetForm, // Tambahkan ini
   }
 }

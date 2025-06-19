@@ -34,6 +34,8 @@ interface AppContextProps {
   setSearchQuery: (query: string) => void
   showMaskedValue: (timeout?: number) => void
   isRevealed: boolean
+  setTransactions: (transactions: Transaction[]) => void
+  setCategories: (categories: Category[]) => void
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined)
@@ -51,11 +53,11 @@ interface AppProviderProps {
 }
 
 export const AppProvider = ({ children }: AppProviderProps) => {
-  const [transactions, setTransactions] = useLocalStorage<Transaction[]>(
+  const [transactions, setStoredTransactions] = useLocalStorage<Transaction[]>(
     'catatinko_transactions',
     []
   )
-  const [categories, setCategories] = useLocalStorage<Category[]>(
+  const [categories, setStoredCategories] = useLocalStorage<Category[]>(
     'catatinko_categories',
     defaultCategories
   )
@@ -73,6 +75,21 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', settings.darkMode)
   }, [settings.darkMode])
+
+  // Direct setters for external updates (like Google Sheets sync)
+  const setTransactions = useCallback(
+    (newTransactions: Transaction[]) => {
+      setStoredTransactions(newTransactions)
+    },
+    [setStoredTransactions]
+  )
+
+  const setCategories = useCallback(
+    (newCategories: Category[]) => {
+      setStoredCategories(newCategories)
+    },
+    [setStoredCategories]
+  )
 
   // Memoized utility functions
   const getCategory = useCallback(
@@ -121,12 +138,12 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     () => ({
       add: (transaction: Omit<Transaction, 'id'>) => {
         const newTransaction = { ...transaction, id: crypto.randomUUID() }
-        setTransactions((prev) => [...prev, newTransaction])
+        setStoredTransactions((prev) => [...prev, newTransaction])
         toast.success('Transaction added successfully')
       },
 
       update: (transaction: Transaction) => {
-        setTransactions((prev) =>
+        setStoredTransactions((prev) =>
           prev.map((t) => (t.id === transaction.id ? transaction : t))
         )
         toast.success('Transaction updated successfully')
@@ -134,19 +151,19 @@ export const AppProvider = ({ children }: AppProviderProps) => {
 
       delete: (id: string) => {
         const transactionToDelete = transactions.find((t) => t.id === id)
-        setTransactions((prev) => prev.filter((t) => t.id !== id))
+        setStoredTransactions((prev) => prev.filter((t) => t.id !== id))
 
         toast.success('Transaction deleted successfully', {
           action: {
             label: 'Undo',
             onClick: () =>
               transactionToDelete &&
-              setTransactions((prev) => [...prev, transactionToDelete]),
+              setStoredTransactions((prev) => [...prev, transactionToDelete]),
           },
         })
       },
     }),
-    [transactions, setTransactions]
+    [transactions, setStoredTransactions]
   )
 
   // Category operations
@@ -154,11 +171,11 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     () => ({
       add: (category: Omit<Category, 'id'>) => {
         const newCategory = { ...category, id: crypto.randomUUID() }
-        setCategories((prev) => [...prev, newCategory])
+        setStoredCategories((prev) => [...prev, newCategory])
       },
 
       update: (category: Category) => {
-        setCategories((prev) =>
+        setStoredCategories((prev) =>
           prev.map((c) => (c.id === category.id ? category : c))
         )
       },
@@ -171,11 +188,11 @@ export const AppProvider = ({ children }: AppProviderProps) => {
           )
           return
         }
-        setCategories((prev) => prev.filter((c) => c.id !== id))
+        setStoredCategories((prev) => prev.filter((c) => c.id !== id))
         toast.success('Category deleted successfully')
       },
     }),
-    [transactions, setCategories]
+    [transactions, setStoredCategories]
   )
 
   const updateSettings = useCallback(
@@ -189,12 +206,12 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     if (
       confirm('Are you sure you want to reset all data? This cannot be undone.')
     ) {
-      setTransactions([])
-      setCategories(defaultCategories)
+      setStoredTransactions([])
+      setStoredCategories(defaultCategories)
       setSettings(defaultSettings)
       toast.success('All data has been reset')
     }
-  }, [setTransactions, setCategories, setSettings])
+  }, [setStoredTransactions, setStoredCategories, setSettings])
 
   const contextValue = useMemo(
     () => ({
@@ -217,6 +234,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       setSearchQuery,
       showMaskedValue,
       isRevealed,
+      setTransactions,
+      setCategories,
     }),
     [
       transactions,
@@ -232,6 +251,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       getCategory,
       resetData,
       showMaskedValue,
+      setTransactions,
+      setCategories,
     ]
   )
 
