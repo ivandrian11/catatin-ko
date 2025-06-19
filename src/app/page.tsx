@@ -53,7 +53,7 @@ export default function Home() {
 
       try {
         setIsDeleting(true)
-        await deleteTransaction(id)
+        deleteTransaction(id)
       } catch (error) {
         console.error('Error deleting transaction:', error)
         alert('Gagal menghapus transaksi. Silakan coba lagi.')

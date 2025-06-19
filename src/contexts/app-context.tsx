@@ -71,6 +71,13 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   const [isRevealed, setIsRevealed] = useState(false)
   const [revealTimer, setRevealTimer] = useState<NodeJS.Timeout | null>(null)
 
+  // Helper function untuk mengurutkan transaksi berdasarkan tanggal (ascending)
+  const sortTransactionsByDate = useCallback((transactions: Transaction[]) => {
+    return [...transactions].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    )
+  }, [])
+
   // Apply dark mode when settings change
   useEffect(() => {
     document.documentElement.classList.toggle('dark', settings.darkMode)
@@ -79,9 +86,10 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   // Direct setters for external updates (like Google Sheets sync)
   const setTransactions = useCallback(
     (newTransactions: Transaction[]) => {
-      setStoredTransactions(newTransactions)
+      const sortedTransactions = sortTransactionsByDate(newTransactions)
+      setStoredTransactions(sortedTransactions)
     },
-    [setStoredTransactions]
+    [setStoredTransactions, sortTransactionsByDate]
   )
 
   const setCategories = useCallback(
@@ -107,7 +115,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     [revealTimer]
   )
 
-  // Memoized filtered transactions
+  // Memoized filtered transactions - sudah terurut dari localStorage
   const filteredTransactions = useMemo(() => {
     const monthFilter = (transaction: Transaction) => {
       const transactionDate = new Date(transaction.date)
@@ -126,11 +134,12 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       )
     }
 
+    // Filter dulu, lalu sort descending untuk tampilan UI
     return transactions
       .filter(
         (transaction) => monthFilter(transaction) && searchFilter(transaction)
       )
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) // DESCENDING untuk UI
   }, [transactions, selectedMonth, searchQuery, getCategory])
 
   // Transaction operations with undo functionality
@@ -138,46 +147,67 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     () => ({
       add: (transaction: Omit<Transaction, 'id'>) => {
         const newTransaction = { ...transaction, id: crypto.randomUUID() }
-        setStoredTransactions((prev) => [...prev, newTransaction])
+        setStoredTransactions((prev) => {
+          const updatedTransactions = [...prev, newTransaction]
+          return sortTransactionsByDate(updatedTransactions)
+        })
         toast.success('Transaction added successfully')
       },
 
       update: (transaction: Transaction) => {
-        setStoredTransactions((prev) =>
-          prev.map((t) => (t.id === transaction.id ? transaction : t))
-        )
+        setStoredTransactions((prev) => {
+          const updatedTransactions = prev.map((t) =>
+            t.id === transaction.id ? transaction : t
+          )
+          return sortTransactionsByDate(updatedTransactions)
+        })
         toast.success('Transaction updated successfully')
       },
 
       delete: (id: string) => {
         const transactionToDelete = transactions.find((t) => t.id === id)
-        setStoredTransactions((prev) => prev.filter((t) => t.id !== id))
+        setStoredTransactions((prev) => {
+          const updatedTransactions = prev.filter((t) => t.id !== id)
+          return sortTransactionsByDate(updatedTransactions)
+        })
 
         toast.success('Transaction deleted successfully', {
           action: {
             label: 'Undo',
-            onClick: () =>
-              transactionToDelete &&
-              setStoredTransactions((prev) => [...prev, transactionToDelete]),
+            onClick: () => {
+              if (transactionToDelete) {
+                setStoredTransactions((prev) => {
+                  const restoredTransactions = [...prev, transactionToDelete]
+                  return sortTransactionsByDate(restoredTransactions)
+                })
+              }
+            },
           },
         })
       },
     }),
-    [transactions, setStoredTransactions]
+    [transactions, setStoredTransactions, sortTransactionsByDate]
   )
 
   // Category operations
   const categoryOperations = useMemo(
     () => ({
       add: (category: Omit<Category, 'id'>) => {
-        const newCategory = { ...category, id: crypto.randomUUID() }
+        // Generate ID based on the highest existing ID + 1
+        const existingIds = categories
+          .map((c) => parseInt(c.id))
+          .filter((id) => !isNaN(id))
+        const nextId = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1
+        const newCategory = { ...category, id: nextId.toString() }
         setStoredCategories((prev) => [...prev, newCategory])
+        toast.success('Category added successfully')
       },
 
       update: (category: Category) => {
         setStoredCategories((prev) =>
           prev.map((c) => (c.id === category.id ? category : c))
         )
+        toast.success('Category updated successfully')
       },
 
       delete: (id: string) => {
@@ -192,7 +222,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         toast.success('Category deleted successfully')
       },
     }),
-    [transactions, setStoredCategories]
+    [categories, transactions, setStoredCategories]
   )
 
   const updateSettings = useCallback(
