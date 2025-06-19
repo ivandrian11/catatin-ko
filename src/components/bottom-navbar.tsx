@@ -17,7 +17,7 @@ export const BottomNavbar = () => {
 
   return (
     <>
-      <div className='fixed bottom-0 left-0 right-0 h-16 border-t flex items-center justify-around'>
+      <div className='fixed bottom-0 left-0 right-0 h-16 bg-background border-t flex items-center justify-around z-20'>
         <Button
           variant='ghost'
           className={`nav-tab flex-1 h-full hover:text-yellow-700 ${
@@ -32,7 +32,7 @@ export const BottomNavbar = () => {
 
         <Button
           variant='ghost'
-          className='border-2 border-white w-14 h-14 absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 rounded-full bg-yellow-700 hover:bg-yellow-800 hover:text-white text-white flex items-center justify-center'
+          className='border-2 border-white w-14 h-14 absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 rounded-full bg-yellow-700 hover:bg-yellow-800 hover:text-white text-white flex items-center justify-center shadow-lg'
           onClick={handleAddTransaction}
         >
           <Plus className='!w-6 !h-6' />

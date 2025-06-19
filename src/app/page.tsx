@@ -5,14 +5,15 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useApp } from '@/contexts/app-context'
 import { useModal } from '@/hooks/use-modal'
-import { calculateTotalByType, formatCurrency, formatMonth } from '@/lib/utils'
-import { ChevronLeft, ChevronRight, Eye, Search, Settings } from 'lucide-react'
-import { useCallback } from 'react'
+import { calculateTotalByType, formatCurrency } from '@/lib/utils'
+import { Eye, Search, Settings } from 'lucide-react'
+import { useCallback, useMemo } from 'react'
 import Image from 'next/image'
-import TransactionItem from '@/components/transactions/transaction-item'
 import { Transaction } from '@/types'
 import TransactionModal from '@/components/modal/transaction-modal'
 import { usePageState } from '@/hooks/use-page-state'
+import TransactionGroup from '@/components/transactions/transaction-group'
+import MonthNavigation from '@/components/month-navigation'
 
 export default function Home() {
   const {
@@ -33,23 +34,27 @@ export default function Home() {
 
   const totalExpenses = calculateTotalByType(filteredTransactions, 'expense')
 
-  const handleMonthNavigation = useCallback(
-    (direction: 'prev' | 'next') => {
-      const newMonth = new Date(selectedMonth)
-      newMonth.setMonth(newMonth.getMonth() + (direction === 'next' ? 1 : -1))
-      setSelectedMonth(newMonth)
-    },
-    [selectedMonth, setSelectedMonth]
-  )
+  // Group transactions by date
+  const groupedTransactions = useMemo(() => {
+    const groups = filteredTransactions.reduce((acc, transaction) => {
+      const dateKey = transaction.date
+      if (!acc[dateKey]) acc[dateKey] = []
+      acc[dateKey].push(transaction)
+      return acc
+    }, {} as Record<string, Transaction[]>)
+
+    return Object.entries(groups)
+      .map(([date, transactions]) => ({ date, transactions }))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  }, [filteredTransactions])
 
   const handleDeleteTransaction = useCallback(
     async (id: string) => {
-      if (isDeleting) return
-
-      const confirmed = window.confirm(
-        'Apakah Anda yakin ingin menghapus transaksi ini?'
+      if (
+        isDeleting ||
+        !window.confirm('Apakah Anda yakin ingin menghapus transaksi ini?')
       )
-      if (!confirmed) return
+        return
 
       try {
         setIsDeleting(true)
@@ -61,7 +66,7 @@ export default function Home() {
         setIsDeleting(false)
       }
     },
-    [isDeleting, deleteTransaction]
+    [isDeleting, deleteTransaction, setIsDeleting]
   )
 
   const handleMaskedValueClick = useCallback(() => {
@@ -72,7 +77,7 @@ export default function Home() {
     return (
       <div className='flex items-center justify-center min-h-screen'>
         <div className='text-center'>
-          <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4'></div>
+          <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4' />
           <p className='text-muted-foreground'>Loading...</p>
         </div>
       </div>
@@ -80,9 +85,9 @@ export default function Home() {
   }
 
   return (
-    <>
+    <div className='flex flex-col h-screen'>
       {/* Header */}
-      <div className='sticky top-0 bg-background z-10 px-4 py-4 flex items-center gap-3'>
+      <div className='sticky top-0 bg-background z-10 px-4 py-4 flex items-center gap-3 border-b'>
         <div className='relative flex-1'>
           <Search className='absolute left-3 top-2.5 h-4 w-4 text-muted-foreground' />
           <Input
@@ -103,26 +108,12 @@ export default function Home() {
       </div>
 
       {/* Month Navigation */}
-      <div className='px-4 mb-6'>
-        <div className='flex items-center justify-between mb-3'>
-          <Button
-            variant='outline'
-            size='icon'
-            onClick={() => handleMonthNavigation('prev')}
-          >
-            <ChevronLeft className='h-4 w-4' />
-          </Button>
-
-          <h2 className='text-lg font-medium'>{formatMonth(selectedMonth)}</h2>
-
-          <Button
-            variant='outline'
-            size='icon'
-            onClick={() => handleMonthNavigation('next')}
-          >
-            <ChevronRight className='h-4 w-4' />
-          </Button>
-        </div>
+      <div className='bg-background px-4 py-4 border-b'>
+        <MonthNavigation
+          selectedMonth={selectedMonth}
+          onMonthChange={setSelectedMonth}
+          className='mb-3'
+        />
 
         {/* Total Expenses */}
         <div className='bg-accent p-4 rounded-lg'>
@@ -130,7 +121,7 @@ export default function Home() {
             Total Pengeluaran
           </p>
           <div
-            className='text-2xl font-bold flex items-center group relative'
+            className='text-2xl font-bold flex items-center group relative cursor-pointer'
             onClick={handleMaskedValueClick}
           >
             {settings.maskValues && !isRevealed ? (
@@ -149,40 +140,43 @@ export default function Home() {
       </div>
 
       {/* Transaction List */}
-      <div className='flex-1 px-4'>
-        {filteredTransactions.length === 0 ? (
-          <div className='flex flex-col items-center justify-center py-8 text-center'>
-            <Image
-              src='/no-data.png'
-              alt='No expenses yet'
-              className='w-56 h-56 mb-4 pointer-events-none'
-              width={224}
-              height={224}
-            />
-            <p className='text-muted-foreground max-w-xs mb-4'>
-              Tap &apos;+&apos; to record your first transaction and start
-              managing your spending.
-            </p>
-          </div>
-        ) : (
-          <div className='space-y-1'>
-            {filteredTransactions.map((transaction) => (
-              <TransactionItem
-                key={transaction.id}
-                transaction={transaction}
-                onEdit={transactionModal.open}
-                onDelete={handleDeleteTransaction}
+      <div className='flex-1 overflow-y-auto pb-20'>
+        <div className='px-4 py-4'>
+          {filteredTransactions.length === 0 ? (
+            <div className='flex flex-col items-center justify-center py-8 text-center'>
+              <Image
+                src='/no-data.png'
+                alt='No expenses yet'
+                className='w-56 h-56 mb-4 pointer-events-none'
+                width={224}
+                height={224}
               />
-            ))}
-          </div>
-        )}
+              <p className='text-muted-foreground max-w-xs mb-4'>
+                Tap &apos;+&apos; to record your first transaction and start
+                managing your spending.
+              </p>
+            </div>
+          ) : (
+            <div className='space-y-4'>
+              {groupedTransactions.map(({ date, transactions }) => (
+                <TransactionGroup
+                  key={date}
+                  date={date}
+                  transactions={transactions}
+                  onEdit={transactionModal.open}
+                  onDelete={handleDeleteTransaction}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Loading Overlay */}
       {isDeleting && (
         <div className='fixed inset-0 bg-black/20 flex items-center justify-center z-[10000]'>
           <div className='bg-background p-4 rounded-lg shadow-lg flex items-center gap-3'>
-            <div className='animate-spin rounded-full h-5 w-5 border-b-2 border-primary'></div>
+            <div className='animate-spin rounded-full h-5 w-5 border-b-2 border-primary' />
             <span className='text-sm'>Menghapus transaksi...</span>
           </div>
         </div>
@@ -194,11 +188,10 @@ export default function Home() {
         onClose={transactionModal.close}
         transaction={transactionModal.data}
       />
-
       <SettingsModal
         isOpen={settingsModal.isOpen}
         onClose={settingsModal.close}
       />
-    </>
+    </div>
   )
 }
