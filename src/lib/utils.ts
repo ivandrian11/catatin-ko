@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import { Transaction } from '@/types'
+import { Category, Transaction } from '@/types'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -115,34 +115,45 @@ export function getYesterdayString(): string {
 }
 
 export function groupTransactionsByCategory(
-  transactions: Transaction[]
-): Record<string, Transaction[]> {
-  return transactions.reduce((grouped, transaction) => {
-    const categoryId = transaction.categoryId
+  transactions: Transaction[],
+  categories: Category[]
+): Array<{ key: string; data: number }> {
+  const grouped = transactions
+    .filter((transaction) => transaction.type === 'expense')
+    .reduce((acc, transaction) => {
+      const categoryId = transaction.categoryId
+      acc[categoryId] = (acc[categoryId] || 0) + transaction.amount
+      return acc
+    }, {} as Record<string, number>)
 
-    if (!grouped[categoryId]) {
-      grouped[categoryId] = []
-    }
-
-    grouped[categoryId].push(transaction)
-    return grouped
-  }, {} as Record<string, Transaction[]>)
+  return Object.entries(grouped)
+    .map(([categoryId, data]) => {
+      const category = categories.find((c) => c.id === categoryId)
+      return {
+        key: category?.name || 'Unknown',
+        data,
+      }
+    })
+    .sort((a, b) => b.data - a.data)
 }
 
-export function groupTransactionsByWeek(
+export function groupTransactionsByDay(
   transactions: Transaction[]
-): Record<number, Transaction[]> {
-  return transactions.reduce((grouped, transaction) => {
-    const date = new Date(transaction.date)
-    const weekNumber = getWeekNumber(date)
+): Array<{ key: Date; data: number }> {
+  const grouped = transactions
+    .filter((transaction) => transaction.type === 'expense')
+    .reduce((acc, transaction) => {
+      const dateKey = transaction.date.split('T')[0] // Get YYYY-MM-DD part
+      acc[dateKey] = (acc[dateKey] || 0) + transaction.amount
+      return acc
+    }, {} as Record<string, number>)
 
-    if (!grouped[weekNumber]) {
-      grouped[weekNumber] = []
-    }
-
-    grouped[weekNumber].push(transaction)
-    return grouped
-  }, {} as Record<number, Transaction[]>)
+  return Object.entries(grouped)
+    .map(([dateString, data]) => ({
+      key: new Date(dateString),
+      data,
+    }))
+    .sort((a, b) => a.key.getTime() - b.key.getTime())
 }
 
 export function isToday(dateString: string): boolean {
